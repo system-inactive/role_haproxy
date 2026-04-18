@@ -1,0 +1,31 @@
+- name: install updates
+  become: yes
+  yum:
+    name: '*'
+    state: latest
+  
+- name: "Install haproxy"
+  become: yes
+  yum:
+   name: "haproxy"
+
+- name: "Copy haproxy config"
+  become: yes
+  template:
+    src: "haproxy.cfg.j2"
+    dest: "/etc/haproxy/haproxy.cfg"
+    backup: yes
+    validate: /usr/sbin/haproxy -c -f %s
+  register: ha_template 
+
+- name: include firewalld
+  include: firewalld.yml
+
+- name: include selinux
+  include: selinux.yml
+  when: ansible_selinux != false
+
+- name: include dns_update
+  include: dns_update.yml
+
+

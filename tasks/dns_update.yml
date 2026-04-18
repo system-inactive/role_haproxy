@@ -1,0 +1,12 @@
+- name: Create dns records 
+  cloudflare_dns:
+    domain: "{{ item.domain }}"
+    record: "{{ item.record }}"
+    type: A
+    value: "{{ item.value }}"
+    solo: true
+    account_email: "{{ item.email }}" 
+    account_api_token: "{{ item.token }}"
+    state: present
+  with_items: "{{ dns }}"
+

@@ -1,0 +1,24 @@
+- name: "Install firewalld"
+  become: true
+  yum:
+    name: "firewalld"  
+  notify: firewalld
+
+- name: Firewalld external ports
+  become: true
+  firewalld:
+    port: "{{ item.port }}/tcp"
+    permanent: yes
+    state: enabled 
+  with_items: "{{ frontend }}"
+  notify: firewalld
+
+- name: Firewalld stat port
+  become: true
+  firewalld:
+    port: "{{ listen.port }}/tcp"
+    permanent: yes
+    state: enabled 
+  notify: firewalld
+
+

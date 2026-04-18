@@ -1,0 +1,15 @@
+- name: "Install libsemanage-python"
+  become: true
+  yum:
+   name: "libsemanage-python"
+
+- name: "set boolean for haproxy"
+  become: true
+  seboolean: 
+    name: haproxy_connect_any
+    state: yes
+    persistent: yes
+  notify: haproxy
+
+
+

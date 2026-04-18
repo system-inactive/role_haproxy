@@ -1,0 +1,17 @@
+- name: haproxy
+  become: true
+  changed_when: true
+  systemd:
+    daemon_reload: true
+    name: haproxy
+    state: restarted
+    enabled: yes
+- name: firewalld 
+  become: true
+  changed_when: true
+  systemd:
+    daemon_reload: true
+    name: firewalld
+    state: restarted
+    enabled: yes
+  listen: firewalld

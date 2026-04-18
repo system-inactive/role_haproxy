@@ -1,0 +1,52 @@
+global
+   log         127.0.0.1 local2
+    chroot      /var/lib/haproxy
+    pidfile     /var/run/haproxy.pid
+    maxconn     4000
+    user        haproxy
+    group       haproxy
+    daemon
+    stats socket /var/lib/haproxy/stats
+
+#---------------------------------------------------------------------
+# common defaults that all the 'listen' and 'backend' sections will
+# use if not designated in their block
+#---------------------------------------------------------------------
+defaults
+    mode                    {{ defaults.mode }}
+    log                     global
+#    option                  httplog
+    option                  dontlognull
+    retries                 {{ defaults.retries | default('3') }}
+    timeout queue           {{ defaults.timeout.queue | default('1m') }}
+    timeout connect         {{ defaults.timeout.connect | default('10s') }}
+    timeout client          {{ defaults.timeout.client | default('1m') }}
+    timeout server          {{ defaults.timeout.server | default('1m') }}
+    timeout check           {{ defaults.timeout.check | default('10s') }}
+    maxconn                 {{ defaults.maxconn | default('3000') }}
+
+{% for fe in frontend %}
+frontend  {{ fe.name }} 
+    bind 0.0.0.0:{{ fe.port }}
+    tcp-request inspect-delay 5s
+    tcp-request content accept if { req_ssl_hello_type 1 }
+    use_backend {{ fe.backend }} if { req_ssl_sni -i {{ fe.name }} }
+{% endfor %}
+
+
+{% for be in backend %}
+backend {{ be.name }}
+    balance     {{ be.balance }}
+{% for server in be.servers %}
+    server {{ server.name }}  {{ server.hostname }}:{{ server.port }}{%if server.backup is defined and server.backup | bool%} backup{% endif %} check
+{% endfor %}
+{% endfor %}
+
+
+listen stats :{{ listen.port }}
+    mode http
+    stats enable
+    stats hide-version
+    stats realm Haproxy\ Statistics
+    stats uri /
+    stats auth {{ listen.user }}:{{ listen.password }}

@@ -1,0 +1,37 @@
+# Terraform state files
+*.tfstate
+*.tfstate.*
+.terraform/
+# Terraform CLI configuration files
+.terraformrc
+terraform.rc
+
+# Variable files (especially those containing sensitive data)
+*.tfvars
+*.tfvars.json
+secret.auto.tfvars
+
+# Crash logs
+crash.log
+
+# Terraform plan files (if not intended for version control)
+*.tfplan
+
+# Local overrides (if used)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Provider and module caches
+.terraform/providers/
+.terraform/modules/
+
+# IDE-specific files (e.g., VS Code)
+.vscode/
+
+*.log
+*.lastimage
+*.DS_Store
+**/.DS_Store
+*.sh
