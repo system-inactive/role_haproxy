@@ -1,38 +1,164 @@
-Role Name
-=========
+# haproxy
 
-A brief description of the role goes here.
+Ansible role for installing and configuring **HAProxy** on RHEL/CentOS-based systems.
 
-Requirements
-------------
+Configures TCP/SNI-based frontend routing, flexible backends with optional backup servers, stats page, firewalld rules, SELinux boolean, and optional Cloudflare DNS record creation.
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+## Requirements
 
-Role Variables
---------------
+- RHEL / CentOS 7+
+- `firewalld` service (installed automatically by the role)
+- For DNS record creation: a Cloudflare account with API access
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+## Role Variables
 
-Dependencies
-------------
+### `defaults` — HAProxy global defaults section
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+```yaml
+defaults:
+  mode: tcp
+  retries: 3
+  maxconn: 3000
+  timeout:
+    queue: 1m
+    connect: 10s
+    client: 1m
+    server: 1m
+    check: 10s
+```
 
-Example Playbook
-----------------
+### `frontend` — list of frontend listeners
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+Each frontend uses SNI-based routing (`tcp-request content accept if { req_ssl_hello_type 1 }`).
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
+```yaml
+frontend:
+  - name: example.com
+    port: 443
+    backend: example_backend
+  - name: api.example.com
+    port: 443
+    backend: api_backend
+```
 
-License
--------
+| Field | Description |
+|---|---|
+| `name` | Frontend name, also used as SNI hostname for routing |
+| `port` | Port to bind on `0.0.0.0` |
+| `backend` | Name of the backend to route matching traffic to |
 
-BSD
+### `backend` — list of backend server pools
 
-Author Information
-------------------
+```yaml
+backend:
+  - name: example_backend
+    balance: roundrobin
+    servers:
+      - name: web01
+        hostname: 192.168.1.10
+        port: 443
+      - name: web02
+        hostname: 192.168.1.11
+        port: 443
+        backup: true
+  - name: api_backend
+    balance: leastconn
+    servers:
+      - name: api01
+        hostname: 192.168.1.20
+        port: 8443
+```
 
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+| Field | Description |
+|---|---|
+| `name` | Backend name (referenced in frontend) |
+| `balance` | Load balancing algorithm: `roundrobin`, `leastconn`, `source`, etc. |
+| `servers` | List of backend servers |
+| `servers[].name` | Server label in HAProxy config |
+| `servers[].hostname` | IP address or hostname |
+| `servers[].port` | Backend port |
+| `servers[].backup` | Optional. Set to `true` to mark server as backup |
+
+### `listen` — stats page
+
+```yaml
+listen:
+  port: 8080
+  user: admin
+  password: strongpassword
+```
+
+Stats page will be available at `http://<host>:8080/`.
+
+### `dns` — optional Cloudflare DNS records
+
+If defined, the role creates DNS A records in Cloudflare after deploying HAProxy.
+
+```yaml
+dns:
+  - domain: example.com
+    record: haproxy
+    value: 203.0.113.10
+    email: admin@example.com
+    token: your_cloudflare_api_key
+```
+
+## Example Playbook
+
+```yaml
+- hosts: haproxy_servers
+  roles:
+    - role: haproxy
+      vars:
+        defaults:
+          mode: tcp
+          retries: 3
+          maxconn: 3000
+          timeout:
+            queue: 1m
+            connect: 10s
+            client: 1m
+            server: 1m
+            check: 10s
+
+        frontend:
+          - name: example.com
+            port: 443
+            backend: example_backend
+
+        backend:
+          - name: example_backend
+            balance: roundrobin
+            servers:
+              - name: web01
+                hostname: 192.168.1.10
+                port: 443
+              - name: web02
+                hostname: 192.168.1.11
+                port: 443
+                backup: true
+
+        listen:
+          port: 8080
+          user: admin
+          password: strongpassword
+```
+
+## What the role does
+
+1. Updates system packages and installs HAProxy
+2. Deploys `/etc/haproxy/haproxy.cfg` from template (with config validation before apply)
+3. Installs and configures firewalld — opens frontend ports and stats port
+4. Configures SELinux boolean `haproxy_connect_any` (when SELinux is enabled)
+5. Optionally creates Cloudflare DNS A records
+6. Restarts HAProxy and firewalld via handlers
+
+## Notes
+
+- HAProxy config is validated with `haproxy -c -f` before being applied — a broken config will not be deployed
+- The role targets **RHEL/CentOS** (uses `yum`). For Debian/Ubuntu-based systems the package manager tasks need adjustment
+- Stats page credentials are stored in plaintext in the config — use Ansible Vault for `listen.password` in production
+
+## License
+
+MIT
